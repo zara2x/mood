@@ -15,13 +15,14 @@ function initApp() {
   const resultsSectionEl = document.getElementById('results-section');
   const playlistExplanationEl = document.getElementById('playlist-explanation');
   const songsContainerEl = document.getElementById('songs-container');
+  const topSongsContainerEl = document.getElementById('top-songs-container');
   const errorMessageEl = document.getElementById('error-message');
   const apiKeyInputEl = document.getElementById('api-key-input');
   
   // Check if all elements exist
   if (!imageUploadEl || !imagePreviewEl || !uploadBtnEl || !generateContainerEl || 
       !generateBtnEl || !loadingEl || !resultsSectionEl || !playlistExplanationEl || 
-      !songsContainerEl || !errorMessageEl || !apiKeyInputEl) {
+      !songsContainerEl || !topSongsContainerEl || !errorMessageEl || !apiKeyInputEl) {
     console.error('Failed to find all required DOM elements');
     return;
   }
@@ -137,13 +138,84 @@ function initApp() {
   function displayPlaylistResults(responseData) {
     // Clear previous results
     songsContainerEl.innerHTML = '';
+    topSongsContainerEl.innerHTML = '';
     
     // Display playlist explanation
     playlistExplanationEl.textContent = responseData.explanation || "Claude analyzed your image and created this playlist:";
     
     console.log(`Displaying ${responseData.songs.length} songs`);
     
-    // Create song cards
+    // Create top 3 song cards
+    const topSongs = responseData.songs.slice(0, 3);
+    
+    topSongs.forEach((song, index) => {
+      console.log(`Creating top song card ${index + 1}:`, song);
+      
+      // Create top song card
+      const songCard = document.createElement('div');
+      songCard.className = 'song-card top-song-card';
+      
+      // Create song header
+      const songHeader = document.createElement('div');
+      songHeader.className = 'song-header';
+      
+      const songTitle = document.createElement('h3');
+      songTitle.className = 'song-title';
+      songTitle.textContent = `"${song.title}"`;
+      
+      const songArtist = document.createElement('p');
+      songArtist.className = 'song-artist';
+      songArtist.textContent = song.artist;
+      
+      songHeader.appendChild(songTitle);
+      songHeader.appendChild(songArtist);
+      
+      // Create video container
+      const videoContainer = document.createElement('div');
+      videoContainer.className = 'video-container';
+      
+      // Extract search query for YouTube embed
+      const searchQuery = encodeURIComponent(`${song.title} ${song.artist}`);
+      
+      const iframe = document.createElement('iframe');
+      iframe.src = `https://www.youtube.com/embed?listType=search&list=${searchQuery}`;
+      iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
+      iframe.allowFullscreen = true;
+      
+      videoContainer.appendChild(iframe);
+      
+      // Create song footer with Spotify button
+      const songFooter = document.createElement('div');
+      songFooter.className = 'song-footer';
+      
+      const spotifyBtn = document.createElement('a');
+      spotifyBtn.className = 'spotify-btn';
+      spotifyBtn.href = song.spotifyLink;
+      spotifyBtn.target = '_blank';
+      spotifyBtn.rel = 'noopener noreferrer';
+      
+      const spotifyIcon = document.createElement('img');
+      spotifyIcon.className = 'spotify-icon';
+      spotifyIcon.src = '/images/spotify-icon.svg';
+      spotifyIcon.alt = 'Spotify';
+      
+      const spotifyText = document.createTextNode('Open in Spotify');
+      
+      spotifyBtn.appendChild(spotifyIcon);
+      spotifyBtn.appendChild(spotifyText);
+      
+      songFooter.appendChild(spotifyBtn);
+      
+      // Assemble song card
+      songCard.appendChild(songHeader);
+      songCard.appendChild(videoContainer);
+      songCard.appendChild(songFooter);
+      
+      // Add to top songs container
+      topSongsContainerEl.appendChild(songCard);
+    });
+    
+    // Create full song list
     responseData.songs.forEach((song, index) => {
       console.log(`Creating card for song ${index + 1}:`, song);
       

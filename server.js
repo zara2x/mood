@@ -143,7 +143,7 @@ function processClaudeResponse(responseText) {
   if (songs.length === 0) {
     const lines = responseText.split('\n');
     for (const line of lines) {
-      // Look for lines that might be song listings
+      // Look for lines that might be song listingsr
       if ((line.includes('"') || line.includes('"') || line.includes('"')) && 
           (line.includes(' - ') || line.includes(' by '))) {
         let title = '';
