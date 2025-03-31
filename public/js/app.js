@@ -145,12 +145,10 @@ function initApp() {
     
     console.log(`Displaying ${responseData.songs.length} songs`);
     
-    // Create top 3 song cards
-    const topSongs = responseData.songs.slice(0, 3);
-    
-    topSongs.forEach((song, index) => {
-      console.log(`Creating top song card ${index + 1}:`, song);
-      
+    // The server already reordered the songs array to put the top song first,
+    // so we can just display the first song as the top song
+    const topSong = responseData.songs[0]; // Just use the first song (which should be the top song after server reordering)
+    console.log("Top song:", topSong);
       // Create top song card
       const songCard = document.createElement('div');
       songCard.className = 'song-card top-song-card';
@@ -161,11 +159,11 @@ function initApp() {
       
       const songTitle = document.createElement('h3');
       songTitle.className = 'song-title';
-      songTitle.textContent = `"${song.title}"`;
+    songTitle.textContent = `"${topSong.title}"`;
       
       const songArtist = document.createElement('p');
       songArtist.className = 'song-artist';
-      songArtist.textContent = song.artist;
+    songArtist.textContent = topSong.artist;
       
       songHeader.appendChild(songTitle);
       songHeader.appendChild(songArtist);
@@ -175,10 +173,11 @@ function initApp() {
       videoContainer.className = 'video-container';
       
       // Extract search query for YouTube embed
-      const searchQuery = encodeURIComponent(`${song.title} ${song.artist}`);
+      const searchQuery = encodeURIComponent(`${topSong.title} ${topSong.artist}`);
       
       const iframe = document.createElement('iframe');
-      iframe.src = `https://www.youtube.com/embed?listType=search&list=${searchQuery}`;
+      // Fix: Use correct YouTube search embed URL format
+      iframe.src = `https://www.youtube.com/embed/videoseries?list=search_query=${searchQuery}`;
       iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
       iframe.allowFullscreen = true;
       
@@ -190,7 +189,7 @@ function initApp() {
       
       const spotifyBtn = document.createElement('a');
       spotifyBtn.className = 'spotify-btn';
-      spotifyBtn.href = song.spotifyLink;
+      spotifyBtn.href = topSong.spotifyLink;
       spotifyBtn.target = '_blank';
       spotifyBtn.rel = 'noopener noreferrer';
       
@@ -213,9 +212,9 @@ function initApp() {
       
       // Add to top songs container
       topSongsContainerEl.appendChild(songCard);
-    });
-    
-    // Create full song list
+
+    // For the rest of the songs, create the regular song list
+    // Start from index 0 since we want to show all songs including the top one
     responseData.songs.forEach((song, index) => {
       console.log(`Creating card for song ${index + 1}:`, song);
       
@@ -223,6 +222,11 @@ function initApp() {
       const songCard = document.createElement('div');
       songCard.className = 'song-card';
       
+      // Add a special class if this is the top song
+      if (index === 0) {
+        songCard.classList.add('top-ranked-song');
+      }
+
       // Create song header
       const songHeader = document.createElement('div');
       songHeader.className = 'song-header';
@@ -246,7 +250,8 @@ function initApp() {
       const searchQuery = encodeURIComponent(`${song.title} ${song.artist}`);
       
       const iframe = document.createElement('iframe');
-      iframe.src = `https://www.youtube.com/embed?listType=search&list=${searchQuery}`;
+      // Fix: Use correct YouTube search embed URL format
+      iframe.src = `https://www.youtube.com/embed/videoseries?list=search_query=${searchQuery}`;
       iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
       iframe.allowFullscreen = true;
       

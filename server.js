@@ -3,6 +3,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const axios = require('axios');
+const { PLAYLIST_GENERATION_PROMPT } = require('./constants');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -41,7 +42,7 @@ app.post('/generate-playlist', upload.single('image'), async (req, res) => {
     const base64Image = req.file.buffer.toString('base64');
     const mimeType = req.file.mimetype;
 
-    // Create request payload for Claude API
+    // Create request payload for Claude API with structured format request
     const payload = {
       model: "claude-3-7-sonnet-20250219",
       max_tokens: 1000,
@@ -51,7 +52,7 @@ app.post('/generate-playlist', upload.single('image'), async (req, res) => {
           content: [
             {
               type: "text",
-              text: "Analyze this image and create a music playlist of 9 songs based on the mood, elements, and overall feeling of the image. For each song, provide the title and artist. Also provide a brief explanation about why the playlist matches the image. Out of those 9 pick 3 that best represent the vibe of the image (don't just focus on keywords from the image, contextualise the meaning and pick the most appropriate songs."
+              text: PLAYLIST_GENERATION_PROMPT
             },
             {
               type: "image",
@@ -110,68 +111,84 @@ function processClaudeResponse(responseText) {
   // Log the full response for debugging
   console.log("Claude's full response:", responseText);
   
-  // Extract explanation - get everything before the first numbered item
+  // Extract explanation - get everything before "SONGS:"
   let explanation = "";
-  const firstNumberedItemIndex = responseText.search(/\d+[\.\)]/);
+  const songsMarkerIndex = responseText.indexOf("SONGS:");
   
-  if (firstNumberedItemIndex > 0) {
-    explanation = responseText.substring(0, firstNumberedItemIndex).trim();
+  if (songsMarkerIndex > 0) {
+    explanation = responseText.substring(0, songsMarkerIndex).trim();
   } else {
-    // If we don't find a numbered list, just use the first paragraph
+    // If we don't find the SONGS marker, just use the first paragraph
     const paragraphs = responseText.split('\n\n');
     explanation = paragraphs[0] || responseText;
   }
   
-  // Try different regex patterns to extract songs
-  // Try pattern 1: standard numbered items with quotes and hyphen
-  let songRegex = /\d+[\.\)]\s*[""]([^""]+)[""][\s\-—–]+([^,\n]+)/g;
-  let songs = extractSongsWithRegex(responseText, songRegex);
+  // Extract the songs section
+  let songsSection = "";
+  let topSongInfo = "";
   
-  // If that didn't work, try pattern 2: songs with quotes but no number
-  if (songs.length === 0) {
-    songRegex = /[""]([^""]+)[""][\s\-—–]+([^,\n]+)/g;
-    songs = extractSongsWithRegex(responseText, songRegex);
+  if (songsMarkerIndex > 0) {
+    const topSongMarkerIndex = responseText.indexOf("TOP SONG:");
+    if (topSongMarkerIndex > 0) {
+      songsSection = responseText.substring(songsMarkerIndex, topSongMarkerIndex).trim();
+      topSongInfo = responseText.substring(topSongMarkerIndex).trim();
+    } else {
+      songsSection = responseText.substring(songsMarkerIndex).trim();
+    }
   }
   
-  // If that didn't work, try pattern 3: just look for "Title" by Artist
-  if (songs.length === 0) {
-    songRegex = /[""]([^""]+)[""] by ([^\n]+)/g;
-    songs = extractSongsWithRegex(responseText, songRegex);
-  }
+  // Parse songs from the songs section
+  const songs = [];
   
-  // If still no songs, try an even more generic approach
-  if (songs.length === 0) {
-    const lines = responseText.split('\n');
-    for (const line of lines) {
-      // Look for lines that might be song listingsr
-      if ((line.includes('"') || line.includes('"') || line.includes('"')) && 
-          (line.includes(' - ') || line.includes(' by '))) {
-        let title = '';
-        let artist = '';
-        
-        // Try to extract title between quotes
-        const titleMatch = line.match(/[""]([^""]+)[""]/);
-        if (titleMatch) title = titleMatch[1].trim();
-        
-        // Try to extract artist after hyphen or "by"
-        if (line.includes(' - ')) {
-          artist = line.split(' - ').pop().trim();
-        } else if (line.includes(' by ')) {
-          artist = line.split(' by ').pop().trim();
-        }
+  if (songsSection) {
+    // Remove the "SONGS:" header
+    const songsList = songsSection.replace("SONGS:", "").trim();
+    
+    // Split by numbered lines
+    const songLines = songsList.split(/\n\d+\.\s+/).filter(line => line.trim().length > 0);
+    
+    // Process each song line
+    songLines.forEach(line => {
+      // Match pattern "Song Title" - Artist Name
+      const match = line.match(/[""]([^""]+)[""][\s\-—–]+([^\n]+)/);
+      
+      if (match) {
+        const title = match[1].trim();
+        const artist = match[2].trim();
         
         if (title && artist) {
           songs.push({ title, artist });
         }
+      }
+    });
+  }
+  
+  // Determine the top song
+  let topSongIndex = 0;
+  if (topSongInfo) {
+    const topSongMatch = topSongInfo.match(/TOP SONG:\s*#(\d+)/);
+    if (topSongMatch && topSongMatch[1]) {
+      // Convert to 0-based index and ensure it's valid
+      const index = parseInt(topSongMatch[1]) - 1;
+      if (index >= 0 && index < songs.length) {
+        topSongIndex = index;
       }
     }
   }
   
   // Log extracted songs for debugging
   console.log("Extracted songs:", songs);
+  console.log("Top song index:", topSongIndex);
+  
+  // Reorder songs to put the top song first if needed
+  if (topSongIndex > 0 && topSongIndex < songs.length) {
+    const topSong = songs[topSongIndex];
+    songs.splice(topSongIndex, 1); // Remove top song from its position
+    songs.unshift(topSong); // Add it to the beginning
+  }
   
   // Create links for each song
-  songs = songs.map(song => {
+  const songsWithLinks = songs.map(song => {
     const youtubeSearchQuery = encodeURIComponent(`${song.title} ${song.artist}`);
     const youtubeLink = `https://www.youtube.com/results?search_query=${youtubeSearchQuery}`;
     const spotifyLink = `https://open.spotify.com/search/${encodeURIComponent(song.title + ' ' + song.artist)}`;
@@ -186,25 +203,8 @@ function processClaudeResponse(responseText) {
   // Return the processed response
   return {
     explanation,
-    songs
+    songs: songsWithLinks
   };
-}
-
-// Helper function to extract songs using a regex pattern
-function extractSongsWithRegex(text, regex) {
-  const songs = [];
-  let match;
-  
-  while ((match = regex.exec(text)) !== null) {
-    const title = match[1].trim();
-    const artist = match[2].trim();
-    
-    if (title && artist) {
-      songs.push({ title, artist });
-    }
-  }
-  
-  return songs;
 }
 
 // Start server
