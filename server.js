@@ -51,7 +51,7 @@ app.post('/generate-playlist', upload.single('image'), async (req, res) => {
           content: [
             {
               type: "text",
-              text: "Analyze this image and create a music playlist of 8 songs based on the mood, elements, and overall feeling of the image. For each song, provide the title and artist. Also provide a brief explanation about why the playlist matches the image."
+              text: "Analyze this image and create a music playlist of 9 songs based on the mood, elements, and overall feeling of the image. For each song, provide the title and artist. Also provide a brief explanation about why the playlist matches the image. Out of those 9 pick 3 that best represent the vibe of the image (don't just focus on keywords from the image, contextualise the meaning and pick the most appropriate songs."
             },
             {
               type: "image",
