@@ -133,9 +133,48 @@ function initApp() {
     loadingEl.style.display = 'none';
     generateBtnEl.disabled = false;
   }
+
+  // Function to fetch YouTube video ID for a song
+  async function getYouTubeVideoId(songTitle, artist) {
+    try {
+      const searchQuery = encodeURIComponent(`${songTitle} ${artist} official`);
+      // Use our own endpoint to fetch YouTube search results
+      const response = await fetch(`/youtube-search?q=${searchQuery}`);
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch YouTube video ID');
+      }
+      
+      const data = await response.json();
+      return data.videoId; // The server will return the first video ID from search results
+    } catch (error) {
+      console.error('Error fetching YouTube video ID:', error);
+      return null;
+    }
+  }
   
+  // Function to fetch Spotify track link for a song
+  async function getSpotifyTrackLink(songTitle, artist) {
+    try {
+      const searchQuery = encodeURIComponent(`${songTitle} ${artist}`);
+      // Use our own endpoint to fetch Spotify search results
+      const response = await fetch(`/spotify-search?q=${searchQuery}`);
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch Spotify track link');
+      }
+
+      const data = await response.json();
+      return data.trackUrl; // The server will return the first track URL from search results
+    } catch (error) {
+      console.error('Error fetching Spotify track link:', error);
+      // Fallback to search URL if direct track link fails
+      return `https://open.spotify.com/search/${encodeURIComponent(`${songTitle} ${artist}`)}`;
+    }
+  }
+
   // Function to display playlist results
-  function displayPlaylistResults(responseData) {
+  async function displayPlaylistResults(responseData) {
     // Clear previous results
     songsContainerEl.innerHTML = '';
     topSongsContainerEl.innerHTML = '';
@@ -145,148 +184,17 @@ function initApp() {
     
     console.log(`Displaying ${responseData.songs.length} songs`);
     
-    // The server already reordered the songs array to put the top song first,
-    // so we can just display the first song as the top song
-    const topSong = responseData.songs[0]; // Just use the first song (which should be the top song after server reordering)
+    // The server already reordered the songs array to put the top song first
+    const topSong = responseData.songs[0];
     console.log("Top song:", topSong);
-      // Create top song card
-      const songCard = document.createElement('div');
-      songCard.className = 'song-card top-song-card';
-      
-      // Create song header
-      const songHeader = document.createElement('div');
-      songHeader.className = 'song-header';
-      
-      const songTitle = document.createElement('h3');
-      songTitle.className = 'song-title';
-    songTitle.textContent = `"${topSong.title}"`;
-      
-      const songArtist = document.createElement('p');
-      songArtist.className = 'song-artist';
-    songArtist.textContent = topSong.artist;
-      
-      songHeader.appendChild(songTitle);
-      songHeader.appendChild(songArtist);
-      
-      // Create video container
-      const videoContainer = document.createElement('div');
-      videoContainer.className = 'video-container';
-      
-      // Extract search query for YouTube embed
-      const searchQuery = encodeURIComponent(`${topSong.title} ${topSong.artist}`);
-      
-      const iframe = document.createElement('iframe');
-      // Fix: Use correct YouTube search embed URL format
-      iframe.src = `https://www.youtube.com/embed/videoseries?list=search_query=${searchQuery}`;
-      iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
-      iframe.allowFullscreen = true;
-      
-      videoContainer.appendChild(iframe);
-      
-      // Create song footer with Spotify button
-      const songFooter = document.createElement('div');
-      songFooter.className = 'song-footer';
-      
-      const spotifyBtn = document.createElement('a');
-      spotifyBtn.className = 'spotify-btn';
-      spotifyBtn.href = topSong.spotifyLink;
-      spotifyBtn.target = '_blank';
-      spotifyBtn.rel = 'noopener noreferrer';
-      
-      const spotifyIcon = document.createElement('img');
-      spotifyIcon.className = 'spotify-icon';
-      spotifyIcon.src = '/images/spotify-icon.svg';
-      spotifyIcon.alt = 'Spotify';
-      
-      const spotifyText = document.createTextNode('Open in Spotify');
-      
-      spotifyBtn.appendChild(spotifyIcon);
-      spotifyBtn.appendChild(spotifyText);
-      
-      songFooter.appendChild(spotifyBtn);
-      
-      // Assemble song card
-      songCard.appendChild(songHeader);
-      songCard.appendChild(videoContainer);
-      songCard.appendChild(songFooter);
-      
-      // Add to top songs container
-      topSongsContainerEl.appendChild(songCard);
 
+    // Create and display top song card
+    await createAndDisplaySongCard(topSong, topSongsContainerEl, true);
+    
     // For the rest of the songs, create the regular song list
-    // Start from index 0 since we want to show all songs including the top one
-    responseData.songs.forEach((song, index) => {
-      console.log(`Creating card for song ${index + 1}:`, song);
-      
-      // Create song card
-      const songCard = document.createElement('div');
-      songCard.className = 'song-card';
-      
-      // Add a special class if this is the top song
-      if (index === 0) {
-        songCard.classList.add('top-ranked-song');
-      }
-
-      // Create song header
-      const songHeader = document.createElement('div');
-      songHeader.className = 'song-header';
-      
-      const songTitle = document.createElement('h3');
-      songTitle.className = 'song-title';
-      songTitle.textContent = `"${song.title}"`;
-      
-      const songArtist = document.createElement('p');
-      songArtist.className = 'song-artist';
-      songArtist.textContent = song.artist;
-      
-      songHeader.appendChild(songTitle);
-      songHeader.appendChild(songArtist);
-      
-      // Create video container
-      const videoContainer = document.createElement('div');
-      videoContainer.className = 'video-container';
-      
-      // Extract search query for YouTube embed
-      const searchQuery = encodeURIComponent(`${song.title} ${song.artist}`);
-      
-      const iframe = document.createElement('iframe');
-      // Fix: Use correct YouTube search embed URL format
-      iframe.src = `https://www.youtube.com/embed/videoseries?list=search_query=${searchQuery}`;
-      iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
-      iframe.allowFullscreen = true;
-      
-      videoContainer.appendChild(iframe);
-      
-      // Create song footer with Spotify button
-      const songFooter = document.createElement('div');
-      songFooter.className = 'song-footer';
-      
-      const spotifyBtn = document.createElement('a');
-      spotifyBtn.className = 'spotify-btn';
-      spotifyBtn.href = song.spotifyLink;
-      spotifyBtn.target = '_blank';
-      spotifyBtn.rel = 'noopener noreferrer';
-      
-      const spotifyIcon = document.createElement('img');
-      spotifyIcon.className = 'spotify-icon';
-      spotifyIcon.src = '/images/spotify-icon.svg';
-      spotifyIcon.alt = 'Spotify';
-      
-      const spotifyText = document.createTextNode('Open in Spotify');
-      
-      spotifyBtn.appendChild(spotifyIcon);
-      spotifyBtn.appendChild(spotifyText);
-      
-      songFooter.appendChild(spotifyBtn);
-      
-      // Assemble song card
-      songCard.appendChild(songHeader);
-      songCard.appendChild(videoContainer);
-      songCard.appendChild(songFooter);
-      
-      // Add to songs container
-      songsContainerEl.appendChild(songCard);
-    });
+    for (const song of responseData.songs) {
+      await createAndDisplaySongCard(song, songsContainerEl, false);
+    }
     
     // Show results
     loadingEl.style.display = 'none';
@@ -295,5 +203,91 @@ function initApp() {
     
     // Scroll to results
     resultsSectionEl.scrollIntoView({ behavior: 'smooth' });
+  }
+
+  // Create and display a song card
+  async function createAndDisplaySongCard(song, container, isTopSong) {
+    // Create song card
+    const songCard = document.createElement('div');
+    songCard.className = 'song-card';
+    
+    if (isTopSong) {
+      songCard.classList.add('top-song-card');
+    }
+    
+    // Create song header
+    const songHeader = document.createElement('div');
+    songHeader.className = 'song-header';
+    
+    const songTitle = document.createElement('h3');
+    songTitle.className = 'song-title';
+    songTitle.textContent = `"${song.title}"`;
+    
+    const songArtist = document.createElement('p');
+    songArtist.className = 'song-artist';
+    songArtist.textContent = song.artist;
+    
+    songHeader.appendChild(songTitle);
+    songHeader.appendChild(songArtist);
+    
+    // Create video container
+    const videoContainer = document.createElement('div');
+    videoContainer.className = 'video-container';
+    
+    // Fetch the YouTube video ID for this song
+    let videoId = await getYouTubeVideoId(song.title, song.artist);
+    
+    // If we couldn't get a video ID, fall back to the YouTube search page
+    if (!videoId) {
+      console.log(`Couldn't get video ID for "${song.title}" by ${song.artist}, using search page instead`);
+      videoId = 'videoseries';
+    }
+    
+    const iframe = document.createElement('iframe');
+    if (videoId === 'videoseries') {
+      // Use search results as fallback
+      const searchQuery = encodeURIComponent(`${song.title} ${song.artist}`);
+      iframe.src = `https://www.youtube.com/results?search_query=${searchQuery}`;
+    } else {
+      // Use the specific video ID
+      iframe.src = `https://www.youtube.com/embed/${videoId}`;
+    }
+    iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
+    iframe.allowFullscreen = true;
+    
+    videoContainer.appendChild(iframe);
+    
+    // Create song footer with Spotify button
+    const songFooter = document.createElement('div');
+    songFooter.className = 'song-footer';
+    
+    // Get Spotify track link
+    const spotifyLink = await getSpotifyTrackLink(song.title, song.artist);
+
+    const spotifyBtn = document.createElement('a');
+    spotifyBtn.className = 'spotify-btn';
+    spotifyBtn.href = spotifyLink || song.spotifyLink;
+    spotifyBtn.target = '_blank';
+    spotifyBtn.rel = 'noopener noreferrer';
+    
+    const spotifyIcon = document.createElement('img');
+    spotifyIcon.className = 'spotify-icon';
+    spotifyIcon.src = '/images/spotify-icon.svg';
+    spotifyIcon.alt = 'Spotify';
+    
+    const spotifyText = document.createTextNode('Open in Spotify');
+    
+    spotifyBtn.appendChild(spotifyIcon);
+    spotifyBtn.appendChild(spotifyText);
+    
+    songFooter.appendChild(spotifyBtn);
+    
+    // Assemble song card
+    songCard.appendChild(songHeader);
+    songCard.appendChild(videoContainer);
+    songCard.appendChild(songFooter);
+    
+    // Add to container
+    container.appendChild(songCard);
   }
 }
